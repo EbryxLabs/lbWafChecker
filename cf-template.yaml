@@ -1,0 +1,145 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  LambdaName:
+    Type: String
+    Description: Name of your lambda.
+  LambdaInterval:
+    Type: String
+    Description: Interval of your lambda (in minutes).
+  S3BucketName:
+    Type: String
+    Description: S3 bucket name containing lambda code.
+  S3CodeArchivePath:
+    Type: String
+    Description: Lambda code path inside selected S3 bucket.
+  AESKey:
+    Type: String
+    Description: AES key that code needs to decrypt config file.
+    NoEcho: true
+  AESIV:
+    Type: String
+    Description: AES IV that code needs, along with AES key, to decrypt config file.
+    NoEcho: true
+  ConfigFile:
+    Type: String
+    Description: S3 public path to config file.
+  KMSKeyArn:
+    Type: String
+    Description: ARN of KMS key to use for encryption with lambda.
+Resources:
+  IAMRoleInstance:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Join 
+        - ''
+        - - !Ref LambdaName
+          - '-role'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          Effect: Allow
+          Action:
+            - 'sts:AssumeRole'
+          Principal:
+            Service:
+              - lambda.amazonaws.com
+      Policies:
+        - PolicyName: root
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'kms:Encrypt'
+                  - 'kms:Decrypt'
+                Resource: !Ref KMSKeyArn
+  LambdaInstance:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        S3Bucket: !Ref S3BucketName
+        S3Key: !Ref S3CodeArchivePath
+      FunctionName: !Ref LambdaName
+      Description: 'Lambda, created from stack, to check WAF association for ALBs.'
+      Environment:
+        Variables:
+          AES_KEY: !Ref AESKey
+          AES_IV: !Ref AESIV
+          CONFIG_FILE: !Ref ConfigFile
+      Role: !Join 
+        - ''
+        - - 'arn:aws:iam::'
+          - !Ref 'AWS::AccountId'
+          - ':role/'
+          - !Join 
+            - ''
+            - - !Ref LambdaName
+              - '-role'
+      Handler: script.main
+      Runtime: python3.6
+      MemorySize: 128
+      Timeout: '300'
+      KmsKeyArn: !Ref KMSKeyArn
+    DependsOn:
+      - IAMRoleInstance
+  CloudWatchEvent:
+    Type: 'AWS::Events::Rule'
+    Properties:
+      Description: !Join
+        - ''
+        - - 'Rule for '
+          - !Ref LambdaName
+          - ' lambda.'
+      Name: !Join 
+        - ''
+        - - !Ref LambdaName
+          - '-rule'
+      ScheduleExpression: !Join
+        - ''
+        - - 'cron(*/'
+          - !Ref LambdaInterval
+          - ' * * * ? *)'
+      State: ENABLED
+      Targets:
+        -
+          Arn: !GetAtt
+            - LambdaInstance
+            - Arn
+          Id: !Join 
+            - ''
+            - - 'ruleTarget'
+              - !Ref LambdaName
+    DependsOn:
+      - LambdaInstance
+  CloudWatchEventPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaName
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt
+        - CloudWatchEvent
+        - Arn
+
+Outputs:
+  LambdaName:
+    Description: Name of created AWS Lambda function.
+    Value: !GetAtt 
+      - LambdaInstance
+      - Arn
+  LambdaAttachedRoleName:
+    Description: Name of attached role to AWS Lambda function.
+    Value: !GetAtt 
+      - IAMRoleInstance
+      - Arn
+  CloudWatchRule:
+    Description: Name of CloudWatch rule attached to AWS Lambda function.
+    Value: !GetAtt 
+      - CloudWatchEvent
+      - Arn
