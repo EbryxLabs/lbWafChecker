@@ -56,6 +56,11 @@ Resources:
                 Resource: 'arn:aws:logs:*:*:*'
               - Effect: Allow
                 Action:
+                  - 'waf-regional:ListWebACLs'
+                  - 'waf-regional:ListResourcesForWebACL'
+                Resource: arn:aws:waf-regional:*:*:*
+              - Effect: Allow
+                Action:
                   - 'kms:Encrypt'
                   - 'kms:Decrypt'
                 Resource: !Ref KMSKeyArn
@@ -84,7 +89,7 @@ Resources:
       Handler: script.main
       Runtime: python3.6
       MemorySize: 128
-      Timeout: '300'
+      Timeout: '50'
       KmsKeyArn: !Ref KMSKeyArn
     DependsOn:
       - IAMRoleInstance
