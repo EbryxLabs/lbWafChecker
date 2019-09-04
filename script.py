@@ -115,31 +115,33 @@ def main(event, context):
 
     logger.info(str())
     session = boto3.session.Session()
-    ebstalk = session.client('elasticbeanstalk')
-    logger.info('Created ElasticBeanStalk client.')
 
-    envs = ebstalk.describe_environments(
-        MaxRecords=999).get('Environments', list())
-    logger.info('[%d] ElasticBeanStalk environments fetched.', len(envs))
+    if orig_envs:
+        ebstalk = session.client('elasticbeanstalk')
+        logger.info('Created ElasticBeanStalk client.')
 
-    for env in envs:
-        if env.get('EnvironmentId') not in orig_envs and \
-                env.get('EnvironmentArn') not in orig_envs and \
-                env.get('EnvironmentName') not in orig_envs:
-            continue
+        envs = ebstalk.describe_environments(
+            MaxRecords=999).get('Environments', list())
+        logger.info('[%d] ElasticBeanStalk environments fetched.', len(envs))
 
-        logger.info('  Fetching environment resources...')
-        elbs = [
-            x.get('Name') for x in ebstalk
-            .describe_environment_resources(
-                EnvironmentId=env['EnvironmentId']).get(
-                    'EnvironmentResources', dict()).get(
-                        'LoadBalancers', list()) if x.get('Name')]
+        for env in envs:
+            if env.get('EnvironmentId') not in orig_envs and \
+                    env.get('EnvironmentArn') not in orig_envs and \
+                    env.get('EnvironmentName') not in orig_envs:
+                continue
 
-        orig_elbs = orig_elbs | set(elbs) if elbs else orig_elbs
+            logger.info('  Fetching environment resources...')
+            elbs = [
+                x.get('Name') for x in ebstalk
+                .describe_environment_resources(
+                    EnvironmentId=env['EnvironmentId']).get(
+                        'EnvironmentResources', dict()).get(
+                            'LoadBalancers', list()) if x.get('Name')]
 
-    logger.info('[%d] LBs to watch for WAF association.', len(orig_elbs))
-    logger.info(str())
+            orig_elbs = orig_elbs | set(elbs) if elbs else orig_elbs
+
+        logger.info('[%d] LBs to watch for WAF association.', len(orig_elbs))
+        logger.info(str())
 
     waf = session.client('waf-regional')
     logger.info('Created WAF Regional client.')

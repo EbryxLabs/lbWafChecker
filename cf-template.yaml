@@ -56,7 +56,7 @@ Resources:
                 Resource: 'arn:aws:logs:*:*:*'
               - Effect: Allow
                 Action:
-                  - elbv2:DescribeLoadBalancers
+                  - elasticloadbalancing:DescribeLoadBalancers
                 Resource: 'arn:aws:elasticloadbalancing:*:*:*'
               - Effect: Allow
                 Action:
