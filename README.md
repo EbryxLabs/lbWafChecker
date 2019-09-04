@@ -26,11 +26,18 @@ A sample configuration file is shown below:
     "<arn-2-string>",
     ...
   },
+  "ebstalk_envs": [
+    "<arn-1>",
+    "<environment-name>",
+    "<environment-id>",
+    ...
+  ],
   "slack_hooks": ["<hook-1-url>", ...]
 }
 ```
-**`lb_arns`** is a list of ARN strings of load balancers you want to check WAF association against.  
-**`slack_hooks`** are a list of URI endpoints for alerting on slack.
+**`lb_arns`** is a list of ARN strings of load balancers you want to check WAF association against. **`ebstalk_envs`** is a list of either **`ARN`**, **`EnvironmentID`** or **`EnvironmentName`** of elasticbeanstalk environment. You can provide any of the 3 available values for your elasticbeanstalk. Lastly, **`slack_hooks`** is a list of URI endpoints for alerting on slack.
+> Note that you should provide **`ARN`** or **`EnvironmentID`** or **`EnvironmentName`** of elasticbeanstalk **environment**, not application stack.
 
 ## Slack Alerts
 Program will notify only if ALB under watch is not associated with any WAF on AWS.
+> You will not be notified if ELB mentioned in config doesn't exist on AWS to begin with.

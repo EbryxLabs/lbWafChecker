@@ -56,9 +56,18 @@ Resources:
                 Resource: 'arn:aws:logs:*:*:*'
               - Effect: Allow
                 Action:
+                  - elbv2:DescribeLoadBalancers
+                Resource: 'arn:aws:elasticloadbalancing:*:*:*'
+              - Effect: Allow
+                Action:
                   - 'waf-regional:ListWebACLs'
                   - 'waf-regional:ListResourcesForWebACL'
                 Resource: arn:aws:waf-regional:*:*:*
+              - Effect: Allow
+                Action:
+                  - 'elasticbeanstalk:DescribeEnvironments'
+                  - 'elasticbeanstalk:DescribeEnvironmentResources'
+                Resource: arn:aws:elasticbeanstalk:*:*:*
               - Effect: Allow
                 Action:
                   - 'kms:Encrypt'
