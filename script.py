@@ -60,8 +60,9 @@ def read_config():
 
 def validate_config(config):
 
-    if not config.get('lb_arns'):
-        return _exit(404, 'No `lb_arns` field defined in config.')
+    if not (config.get('lb_arns') or config.get('ebstalk_envs')):
+        return _exit(404, 'Either `lb_arns` or `ebstalk_envs` fields '
+                     'must be defined in config.')
     if not config.get('slack_hooks'):
         return _exit(404, 'No `slack_hooks` field defined in config.')
 
@@ -103,27 +104,66 @@ def main(event, context):
         logger.info(config)
         return config
 
-    orig_arns = set(config.get('lb_arns'))
-    logger.info('[%d] LBs to watch for WAF association.', len(orig_arns))
-    if not orig_arns:
+    orig_elbs = set(config.get('lb_arns'))
+    logger.info('[%d] LBs to watch for WAF association.', len(orig_elbs))
+    orig_envs = set(config.get('ebstalk_envs'))
+    logger.info('[%d] ElasticBeanStalk environments to watch.', len(orig_envs))
+    if not (orig_elbs or orig_envs):
         return _exit(200, 'Everything executed smoothly.')
 
-    session = boto3.session.Session()
+    logger.info(str())
+    session = boto3.session.Session(profile_name='ebryx-soc-l5')
+    ebstalk = session.client('elasticbeanstalk')
+    logger.info('Created ElasticBeanStalk client.')
+
+    envs = ebstalk.describe_environments(
+        MaxRecords=999).get('Environments', list())
+    logger.info('[%d] ElasticBeanStalk environments fetched.', len(envs))
+
+    for env in envs:
+        if env.get('EnvironmentId') not in orig_envs and \
+                env.get('EnvironmentArn') not in orig_envs and \
+                env.get('EnvironmentName') not in orig_envs:
+            continue
+
+        logger.info('  Fetching environment resources...')
+        elbs = [
+            x.get('Name') for x in ebstalk
+            .describe_environment_resources(
+                EnvironmentId=env['EnvironmentId']).get(
+                    'EnvironmentResources', dict()).get(
+                        'LoadBalancers', list()) if x.get('Name')]
+
+        orig_elbs = orig_elbs | set(elbs) if elbs else orig_elbs
+
+    logger.info('[%d] LBs to watch for WAF association.', len(orig_elbs))
+    logger.info(str())
+
     waf = session.client('waf-regional')
-    logger.info('Created waf client.')
+    logger.info('Created WAF Regional client.')
+
     acls = waf.list_web_acls(Limit=100).get('WebACLs', list())
     logger.info('[%d] Web ACLs fetched.', len(acls))
 
     for acl in acls:
         arns = waf.list_resources_for_web_acl(
             WebACLId=acl['WebACLId']).get('ResourceArns', list())
-        orig_arns = orig_arns - set(arns)
-        if not orig_arns:
+        orig_elbs = orig_elbs - set(arns)
+        if not orig_elbs:
             logger.info('No LBs remaining to watch.')
             break
 
-    if orig_arns:
-        alert_on_slack(config, orig_arns)
+    logger.info(str())
+    logger.info('Fetching all ELBs from AWS.')
+    elbclient = session.client('elbv2')
+    all_elbs = [
+        x.get('LoadBalancerArn') for x in elbclient
+        .describe_load_balancers().get('LoadBalancers', list())
+        if x.get('LoadBalancerArn')]
+    logger.info('[%d] Total ELBs fetched from AWS.', len(all_elbs))
+
+    orig_elbs = [x for x in orig_elbs if x in all_elbs]
+    alert_on_slack(config, orig_elbs) if orig_elbs else None
 
 
 if __name__ == "__main__":
