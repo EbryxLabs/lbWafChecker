@@ -57,7 +57,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - elasticloadbalancing:DescribeLoadBalancers
-                Resource: 'arn:aws:elasticloadbalancing:*:*:*'
+                Resource: '*'
               - Effect: Allow
                 Action:
                   - 'waf-regional:ListWebACLs'
