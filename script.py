@@ -104,15 +104,17 @@ def main(event, context):
         logger.info(config)
         return config
 
-    orig_elbs = set(config.get('lb_arns'))
+    orig_elbs = set(config.get('lb_arns')) \
+        if config.get('lb_arns') else list()
     logger.info('[%d] LBs to watch for WAF association.', len(orig_elbs))
-    orig_envs = set(config.get('ebstalk_envs'))
+    orig_envs = set(config.get('ebstalk_envs')) \
+        if config.get('ebstalk_envs') else list()
     logger.info('[%d] ElasticBeanStalk environments to watch.', len(orig_envs))
     if not (orig_elbs or orig_envs):
         return _exit(200, 'Everything executed smoothly.')
 
     logger.info(str())
-    session = boto3.session.Session(profile_name='ebryx-soc-l5')
+    session = boto3.session.Session()
     ebstalk = session.client('elasticbeanstalk')
     logger.info('Created ElasticBeanStalk client.')
 
